@@ -88,16 +88,16 @@ type Config struct {
 
 // DefaultConfig returns a default configuration
 func DefaultConfig() Config {
-	return Config{
-		Level:         InfoLevel,
-		EnableJSON:    false,
-		EnableTime:    true,
-		EnableCaller:  true,
-		DisableColors: false,
-		CallerSkip:    3,    // Skip internal logger calls
-		CallerDepth:   10,   // Default stack trace depth
-		Writer:        os.Stdout,
-	}
+    return Config{
+        Level:         InfoLevel,
+        EnableJSON:    false,
+        EnableTime:    true,
+        EnableCaller:  true,
+        DisableColors: false,
+        CallerSkip:    3,    // Skip internal logger calls
+        CallerDepth:   10,   // Default stack trace depth
+        Writer:        os.Stdout, // Make sure this is not nil
+    }
 }
 
 // StandardLogger is the standard implementation of Logger
@@ -121,11 +121,16 @@ type Timer struct {
 
 // New creates a new StandardLogger with the given configuration
 func New(config Config) Logger {
-	return &StandardLogger{
-		config: config,
-		fields: make(map[string]interface{}),
-		timers: make(map[string]*Timer),
-	}
+    // Ensure we have a writer to prevent nil pointer dereference
+    if config.Writer == nil {
+        config.Writer = os.Stdout
+    }
+    
+    return &StandardLogger{
+        config: config,
+        fields: make(map[string]interface{}),
+        timers: make(map[string]*Timer),
+    }
 }
 
 // Default creates a new StandardLogger with default configuration
@@ -135,23 +140,23 @@ func Default() Logger {
 
 // With adds a key-value pair to the logger
 func (l *StandardLogger) With(key string, value interface{}) Logger {
-	newLogger := &StandardLogger{
-		config: l.config,
-		fields: make(map[string]interface{}),
-		layer:  l.layer,
-		trace:  l.trace,
-		timers: make(map[string]*Timer),
-	}
-	
-	// Copy existing fields
-	for k, v := range l.fields {
-		newLogger.fields[k] = v
-	}
-	
-	// Add new field
-	newLogger.fields[key] = value
-	
-	return newLogger
+    newLogger := &StandardLogger{
+        config: l.config, // This should include the writer
+        fields: make(map[string]interface{}),
+        layer:  l.layer,
+        trace:  l.trace,
+        timers: make(map[string]*Timer),
+    }
+    
+    // Copy existing fields
+    for k, v := range l.fields {
+        newLogger.fields[k] = v
+    }
+    
+    // Add new field
+    newLogger.fields[key] = value
+    
+    return newLogger
 }
 
 // WithFields adds multiple key-value pairs to the logger
@@ -483,3 +488,4 @@ func (l *StandardLogger) Panic(args ...interface{}) {
 func (l *StandardLogger) Panicf(format string, args ...interface{}) {
 	l.logf(PanicLevel, format, args...)
 }
+

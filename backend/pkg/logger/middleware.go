@@ -11,7 +11,7 @@ import (
 type ctxKey int
 
 const (
-	loggerKey ctxKey = iota
+	LoggerKey ctxKey = iota
 	requestIDKey
 )
 
@@ -34,7 +34,7 @@ func HTTPMiddleware(logger Logger) func(next http.Handler) http.Handler {
 				With("user_agent", r.UserAgent())
 			
 			// Store logger in context
-			ctx := context.WithValue(r.Context(), loggerKey, reqLogger)
+			ctx := context.WithValue(r.Context(), LoggerKey, reqLogger)
 			ctx = context.WithValue(ctx, requestIDKey, requestID)
 			r = r.WithContext(ctx)
 			
@@ -84,7 +84,7 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 
 // FromContext retrieves the logger from the context
 func FromContext(ctx context.Context) Logger {
-	logger, ok := ctx.Value(loggerKey).(Logger)
+	logger, ok := ctx.Value(LoggerKey).(Logger)
 	if !ok {
 		return Default()
 	}

@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+type LogLevel int
+
 // Log levels
 const (
 	DebugLevel = iota
@@ -142,7 +144,7 @@ func Default() Logger {
 func (l *StandardLogger) With(key string, value interface{}) Logger {
     newLogger := &StandardLogger{
         config: l.config, // This should include the writer
-        fields: make(map[string]interface{}),
+        fields: make(map[string]any),
         layer:  l.layer,
         trace:  l.trace,
         timers: make(map[string]*Timer),
@@ -160,10 +162,10 @@ func (l *StandardLogger) With(key string, value interface{}) Logger {
 }
 
 // WithFields adds multiple key-value pairs to the logger
-func (l *StandardLogger) WithFields(fields map[string]interface{}) Logger {
+func (l *StandardLogger) WithFields(fields map[string]any) Logger {
 	newLogger := &StandardLogger{
 		config: l.config,
-		fields: make(map[string]interface{}),
+		fields: make(map[string]any),
 		layer:  l.layer,
 		trace:  l.trace,
 		timers: make(map[string]*Timer),

@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"maps"
+
 	"github.com/0xsj/alya.io/backend/pkg/logger"
 )
 
@@ -42,7 +44,7 @@ type AppError struct {
 	Status     int                    // HTTP status code
 	LogLevel   int                    // Log level for this error
 	StackTrace string                 // Stack trace when the error occurred
-	Fields     map[string]interface{} // Additional context fields
+	Fields     map[string]any		  // Additional context fields
 	Timestamp  time.Time              // Time when the error occurred
 	Operation  string                 // Operation that failed (function name, API endpoint, etc.)
 }
@@ -69,22 +71,20 @@ func (e *AppError) Is(target error) bool {
 }
 
 // WithField adds a context field to the error
-func (e *AppError) WithField(key string, value interface{}) *AppError {
+func (e *AppError) WithField(key string, value any) *AppError {
 	if e.Fields == nil {
-		e.Fields = make(map[string]interface{})
+		e.Fields = make(map[string]any)
 	}
 	e.Fields[key] = value
 	return e
 }
 
 // WithFields adds multiple context fields to the error
-func (e *AppError) WithFields(fields map[string]interface{}) *AppError {
+func (e *AppError) WithFields(fields map[string]any) *AppError {
 	if e.Fields == nil {
-		e.Fields = make(map[string]interface{})
+		e.Fields = make(map[string]any)
 	}
-	for k, v := range fields {
-		e.Fields[k] = v
-	}
+	maps.Copy(e.Fields, fields)
 	return e
 }
 
@@ -185,7 +185,6 @@ func newError(err error, message string, code string, status int, logLevel int) 
 	}
 }
 
-// Helper functions for creating specific error types
 
 // NewBadRequestError creates a new bad request error
 func NewBadRequestError(message string, err error) *AppError {
@@ -304,7 +303,6 @@ func WrapWith(err error, message string, errType *AppError) error {
 	}
 }
 
-// Helper functions for checking error types
 
 // IsNotFound checks if an error is a Not Found error
 func IsNotFound(err error) bool {

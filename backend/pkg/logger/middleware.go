@@ -15,7 +15,6 @@ const (
 	requestIDKey
 )
 
-// HTTPMiddleware is a middleware that logs HTTP requests
 func HTTPMiddleware(logger Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +52,7 @@ func HTTPMiddleware(logger Logger) func(next http.Handler) http.Handler {
 			duration := time.Since(start)
 			
 			// Log request completion
-			reqLogger.WithFields(map[string]interface{}{
+			reqLogger.WithFields(map[string]any{
 				"status":       ww.statusCode,
 				"duration_ms":  duration.Milliseconds(),
 				"content_type": w.Header().Get("Content-Type"),
@@ -62,19 +61,16 @@ func HTTPMiddleware(logger Logger) func(next http.Handler) http.Handler {
 	}
 }
 
-// responseWriter is a wrapper around http.ResponseWriter to capture the status code
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int
 }
 
-// WriteHeader captures the status code
 func (rw *responseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-// Write captures the status code if not already set
 func (rw *responseWriter) Write(b []byte) (int, error) {
 	if rw.statusCode == 0 {
 		rw.statusCode = http.StatusOK
@@ -82,7 +78,6 @@ func (rw *responseWriter) Write(b []byte) (int, error) {
 	return rw.ResponseWriter.Write(b)
 }
 
-// FromContext retrieves the logger from the context
 func FromContext(ctx context.Context) Logger {
 	logger, ok := ctx.Value(LoggerKey).(Logger)
 	if !ok {
@@ -91,7 +86,6 @@ func FromContext(ctx context.Context) Logger {
 	return logger
 }
 
-// RequestIDFromContext retrieves the request ID from the context
 func RequestIDFromContext(ctx context.Context) string {
 	requestID, ok := ctx.Value(requestIDKey).(string)
 	if !ok {
@@ -100,8 +94,6 @@ func RequestIDFromContext(ctx context.Context) string {
 	return requestID
 }
 
-// generateRequestID generates a unique request ID
 func generateRequestID() string {
-	// Simple implementation - in production, use a more robust method
 	return fmt.Sprintf("%d", time.Now().UnixNano())
 }

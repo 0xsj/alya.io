@@ -15,15 +15,15 @@ import (
 type Response struct {
 	Success bool        `json:"success"`
 	Message string      `json:"message,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
-	Meta    interface{} `json:"meta,omitempty"`
+	Data    any `json:"data,omitempty"`
+	Meta    any `json:"meta,omitempty"`
 }
 
 // ErrorResponse is a standard API error response structure
 type ErrorResponse struct {
 	Code    string      `json:"code"`
 	Message string      `json:"message"`
-	Details interface{} `json:"details,omitempty"`
+	Details any			`json:"details,omitempty"`
 }
 
 // PaginationMeta holds pagination metadata
@@ -91,7 +91,7 @@ var (
 )
 
 // JSON writes a JSON response to the provided ResponseWriter
-func JSON(w http.ResponseWriter, statusCode int, data interface{}) error {
+func JSON(w http.ResponseWriter, statusCode int, data any) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	
@@ -99,7 +99,7 @@ func JSON(w http.ResponseWriter, statusCode int, data interface{}) error {
 }
 
 // Success sends a successful response
-func Success(w http.ResponseWriter, data interface{}, message string, statusCode ...int) error {
+func Success(w http.ResponseWriter, data any, message string, statusCode ...int) error {
 	resp := Response{
 		Success: true,
 		Data:    data,
@@ -118,17 +118,17 @@ func Success(w http.ResponseWriter, data interface{}, message string, statusCode
 }
 
 // Created sends a 201 Created response
-func Created(w http.ResponseWriter, data interface{}, message string) error {
+func Created(w http.ResponseWriter, data any, message string) error {
 	return Success(w, data, message, http.StatusCreated)
 }
 
 // Accepted sends a 202 Accepted response for async processing
-func Accepted(w http.ResponseWriter, data interface{}, message string) error {
+func Accepted(w http.ResponseWriter, data any, message string) error {
 	return Success(w, data, message, http.StatusAccepted)
 }
 
 // WithPagination sends a paginated response
-func WithPagination(w http.ResponseWriter, data interface{}, meta PaginationMeta) error {
+func WithPagination(w http.ResponseWriter, data any, meta PaginationMeta) error {
 	resp := Response{
 		Success: true,
 		Data:    data,
@@ -144,7 +144,7 @@ func NoContent(w http.ResponseWriter) {
 }
 
 // Error sends an error response
-func Error(w http.ResponseWriter, err ErrorResponse, details ...interface{}) error {
+func Error(w http.ResponseWriter, err ErrorResponse, details ...any) error {
 	if len(details) > 0 {
 		err.Details = details[0]
 	}

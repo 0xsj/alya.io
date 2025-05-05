@@ -15,3 +15,23 @@ type EnvProvider interface {
 }
 
 type OsEnvProvider struct {}
+
+func Get(){}
+
+func GetDefault(){}
+
+func GetBool() {}
+
+func GetBoolDefault() {}
+
+func GetInt() {}
+
+func GetIntDefault() {}
+
+func GetDuration() {}
+
+func GetDurationDefault() {}
+
+func GetArray() {}
+
+func NewEnvtProvider() {}

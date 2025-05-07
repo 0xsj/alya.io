@@ -32,12 +32,12 @@ var levelNames = map[int]string{
 }
 
 var levelColors = map[int]string{
-	DebugLevel: "\033[36m", // Cyan
-	InfoLevel:  "\033[32m", // Green
-	WarnLevel:  "\033[33m", // Yellow
-	ErrorLevel: "\033[31m", // Red
-	FatalLevel: "\033[35m", // Magenta
-	PanicLevel: "\033[41m", // Red background
+	DebugLevel: "\033[36m",
+	InfoLevel:  "\033[32m",
+	WarnLevel:  "\033[33m",
+	ErrorLevel: "\033[31m",
+	FatalLevel: "\033[35m",
+	PanicLevel: "\033[41m",
 }
 
 // ColorReset is the ANSI code to reset color

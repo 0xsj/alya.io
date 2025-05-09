@@ -1,0 +1,51 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: alya-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - ALYA_ENV=development
+      - ALYA_SERVER_PORT=8080
+      - ALYA_DB_HOST=db
+      - ALYA_DB_PORT=5432
+      - ALYA_DB_USER=postgres
+      - ALYA_DB_PASSWORD=postgres
+      - ALYA_DB_NAME=alya
+      - ALYA_LOG_LEVEL=debug
+      - ALYA_YOUTUBE_API_KEY=your_youtube_api_key
+      - ALYA_AI_API_KEY=your_ai_api_key
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
+
+  db:
+    image: postgres:14-alpine
+    container_name: alya-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=alya
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: alya-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:

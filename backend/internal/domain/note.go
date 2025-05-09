@@ -1,3 +1,4 @@
+
 // internal/domain/note.go
 package domain
 

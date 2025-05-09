@@ -24,25 +24,29 @@ func HTTPMiddleware(logger Logger) func(next http.Handler) http.Handler {
 			}
 			
 			start := time.Now()
-			
 			reqLogger := logger.With("request_id", requestID).
 				With("method", r.Method).
 				With("path", r.URL.Path).
 				With("remote_addr", r.RemoteAddr).
 				With("user_agent", r.UserAgent())
-			
+		
 			ctx := context.WithValue(r.Context(), LoggerKey, reqLogger)
 			ctx = context.WithValue(ctx, requestIDKey, requestID)
 			r = r.WithContext(ctx)
 			
+			// Add request ID to response headers
 			w.Header().Set("X-Request-ID", requestID)
 			
+			// Create response wrapper to capture status code
+		
 			ww := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 			
 			reqLogger.Infof("Request started: %s %s", r.Method, r.URL.Path)
 			
+			// Execute the handler
 			next.ServeHTTP(ww, r)
 			
+			// Calculate duration
 			duration := time.Since(start)
 			
 			reqLogger.WithFields(map[string]any{

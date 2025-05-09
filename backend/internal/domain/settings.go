@@ -1,3 +1,4 @@
+
 // internal/domain/settings.go
 package domain
 

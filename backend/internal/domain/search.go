@@ -1,3 +1,4 @@
+
 // internal/domain/search.go
 package domain
 

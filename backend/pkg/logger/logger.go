@@ -4,6 +4,7 @@ package logger
 import (
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -12,7 +13,8 @@ import (
 	"time"
 )
 
-// Log levels
+type LogLevel int
+
 const (
 	DebugLevel = iota
 	InfoLevel
@@ -40,77 +42,67 @@ var levelColors = map[int]string{
 	PanicLevel: "\033[41m",
 }
 
-// ColorReset is the ANSI code to reset color
 const ColorReset = "\033[0m"
 
-// Logger interface defines the methods available for logging
 type Logger interface {
-	Debug(args ...interface{})
-	Debugf(format string, args ...interface{})
-	Info(args ...interface{})
-	Infof(format string, args ...interface{})
-	Warn(args ...interface{})
-	Warnf(format string, args ...interface{})
-	Error(args ...interface{})
-	Errorf(format string, args ...interface{})
-	Fatal(args ...interface{})
-	Fatalf(format string, args ...interface{})
-	Panic(args ...interface{})
-	Panicf(format string, args ...interface{})
+	Debug(args ...any)
+	Debugf(format string, args ...any)
+	Info(args ...any)
+	Infof(format string, args ...any)
+	Warn(args ...any)
+	Warnf(format string, args ...any)
+	Error(args ...any)
+	Errorf(format string, args ...any)
+	Fatal(args ...any)
+	Fatalf(format string, args ...any)
+	Panic(args ...any)
+	Panicf(format string, args ...any)
 	
-	// Field methods
-	With(key string, value interface{}) Logger
-	WithFields(fields map[string]interface{}) Logger
+	With(key string, value any) Logger
+	WithFields(fields map[string]any) Logger
 	
-	// Layer methods
 	WithLayer(layer string) Logger
 	
-	// Stack trace
 	WithStackTrace() Logger
 	
-	// Timer methods
 	Timer(name string) *Timer
 	TimerStart(name string) 
 	TimerStop(name string)
 }
 
-// Config holds logger configuration
 type Config struct {
 	Level         int
 	EnableJSON    bool
 	EnableTime    bool
 	EnableCaller  bool
 	DisableColors bool
-	CallerSkip    int      // Number of frames to skip for caller
-	CallerDepth   int      // Max depth for stack trace
+	CallerSkip    int      
+	CallerDepth   int      
 	Writer        io.Writer
 }
 
-// DefaultConfig returns a default configuration
 func DefaultConfig() Config {
-	return Config{
-		Level:         InfoLevel,
-		EnableJSON:    false,
-		EnableTime:    true,
-		EnableCaller:  true,
-		DisableColors: false,
-		CallerSkip:    3,    // Skip internal logger calls
-		CallerDepth:   10,   // Default stack trace depth
-		Writer:        os.Stdout,
-	}
+    return Config{
+        Level:         InfoLevel,
+        EnableJSON:    false,
+        EnableTime:    true,
+        EnableCaller:  true,
+        DisableColors: false,
+        CallerSkip:    3,    
+        CallerDepth:   10,   
+        Writer:        os.Stdout, 
+    }
 }
 
-// StandardLogger is the standard implementation of Logger
 type StandardLogger struct {
 	config Config
-	fields map[string]interface{}
+	fields map[string]any
 	layer  string
 	trace  bool
 	timers map[string]*Timer
-	mu     sync.Mutex // For thread-safe timer operations
+	mu     sync.Mutex 
 }
 
-// Timer represents a timer for measuring execution time
 type Timer struct {
 	Name      string
 	StartTime time.Time
@@ -119,101 +111,82 @@ type Timer struct {
 	logger    *StandardLogger
 }
 
-// New creates a new StandardLogger with the given configuration
 func New(config Config) Logger {
-	return &StandardLogger{
-		config: config,
-		fields: make(map[string]interface{}),
-		timers: make(map[string]*Timer),
-	}
+    if config.Writer == nil {
+        config.Writer = os.Stdout
+    }
+    
+    return &StandardLogger{
+        config: config,
+        fields: make(map[string]any),
+        timers: make(map[string]*Timer),
+    }
 }
 
-// Default creates a new StandardLogger with default configuration
 func Default() Logger {
 	return New(DefaultConfig())
 }
 
-// With adds a key-value pair to the logger
-func (l *StandardLogger) With(key string, value interface{}) Logger {
+func (l *StandardLogger) With(key string, value any) Logger {
+    newLogger := &StandardLogger{
+        config: l.config, 
+        fields: make(map[string]any),
+        layer:  l.layer,
+        trace:  l.trace,
+        timers: make(map[string]*Timer),
+    }
+    
+    maps.Copy(newLogger.fields, l.fields)
+    
+    newLogger.fields[key] = value
+    
+    return newLogger
+}
+
+func (l *StandardLogger) WithFields(fields map[string]any) Logger {
 	newLogger := &StandardLogger{
 		config: l.config,
-		fields: make(map[string]interface{}),
+		fields: make(map[string]any),
 		layer:  l.layer,
 		trace:  l.trace,
 		timers: make(map[string]*Timer),
 	}
 	
-	// Copy existing fields
-	for k, v := range l.fields {
-		newLogger.fields[k] = v
-	}
+	maps.Copy(newLogger.fields, l.fields)
 	
-	// Add new field
-	newLogger.fields[key] = value
+	maps.Copy(newLogger.fields, fields)
 	
 	return newLogger
 }
 
-// WithFields adds multiple key-value pairs to the logger
-func (l *StandardLogger) WithFields(fields map[string]interface{}) Logger {
-	newLogger := &StandardLogger{
-		config: l.config,
-		fields: make(map[string]interface{}),
-		layer:  l.layer,
-		trace:  l.trace,
-		timers: make(map[string]*Timer),
-	}
-	
-	// Copy existing fields
-	for k, v := range l.fields {
-		newLogger.fields[k] = v
-	}
-	
-	// Add new fields
-	for k, v := range fields {
-		newLogger.fields[k] = v
-	}
-	
-	return newLogger
-}
-
-// WithLayer adds a layer identifier to the logger
 func (l *StandardLogger) WithLayer(layer string) Logger {
 	newLogger := &StandardLogger{
 		config: l.config,
-		fields: make(map[string]interface{}),
+		fields: make(map[string]any),
 		layer:  layer,
 		trace:  l.trace,
 		timers: make(map[string]*Timer),
 	}
-	
-	// Copy existing fields
-	for k, v := range l.fields {
-		newLogger.fields[k] = v
-	}
+
+	maps.Copy(newLogger.fields, l.fields)
 	
 	return newLogger
 }
 
-// WithStackTrace enables stack trace logging
 func (l *StandardLogger) WithStackTrace() Logger {
 	newLogger := &StandardLogger{
 		config: l.config,
-		fields: make(map[string]interface{}),
+		fields: make(map[string]any),
 		layer:  l.layer,
 		trace:  true,
 		timers: make(map[string]*Timer),
 	}
 	
-	// Copy existing fields
-	for k, v := range l.fields {
-		newLogger.fields[k] = v
-	}
+	maps.Copy(newLogger.fields, l.fields)
 	
 	return newLogger
 }
 
-// Timer creates and starts a new timer
 func (l *StandardLogger) Timer(name string) *Timer {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -228,12 +201,10 @@ func (l *StandardLogger) Timer(name string) *Timer {
 	return timer
 }
 
-// TimerStart starts a timer with the given name
 func (l *StandardLogger) TimerStart(name string) {
 	l.Timer(name)
 }
 
-// TimerStop stops a timer with the given name and logs its duration
 func (l *StandardLogger) TimerStop(name string) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -247,24 +218,19 @@ func (l *StandardLogger) TimerStop(name string) {
 	timer.EndTime = time.Now()
 	timer.Duration = timer.EndTime.Sub(timer.StartTime)
 	
-	// Log the timer information
 	timerLogger := l.With("timer", name).With("duration_ms", timer.Duration.Milliseconds())
 	timerLogger.Debug("Timer completed")
 	
-	// Clean up the timer
 	delete(l.timers, name)
 }
 
-// Stop stops the timer and logs its duration
 func (t *Timer) Stop() time.Duration {
 	t.EndTime = time.Now()
 	t.Duration = t.EndTime.Sub(t.StartTime)
 	
-	// Log the timer information
 	timerLogger := t.logger.With("timer", t.Name).With("duration_ms", t.Duration.Milliseconds())
 	timerLogger.Debug("Timer completed")
 	
-	// Clean up the timer
 	t.logger.mu.Lock()
 	delete(t.logger.timers, t.Name)
 	t.logger.mu.Unlock()
@@ -272,8 +238,7 @@ func (t *Timer) Stop() time.Duration {
 	return t.Duration
 }
 
-// log performs the actual logging
-func (l *StandardLogger) log(level int, args ...interface{}) {
+func (l *StandardLogger) log(level int, args ...any) {
 	if level < l.config.Level {
 		return
 	}
@@ -282,8 +247,7 @@ func (l *StandardLogger) log(level int, args ...interface{}) {
 	l.output(level, message)
 }
 
-// logf performs the actual formatted logging
-func (l *StandardLogger) logf(level int, format string, args ...interface{}) {
+func (l *StandardLogger) logf(level int, format string, args ...any) {
 	if level < l.config.Level {
 		return
 	}
@@ -292,54 +256,44 @@ func (l *StandardLogger) logf(level int, format string, args ...interface{}) {
 	l.output(level, message)
 }
 
-// getStackTrace returns the stack trace as a string
 func (l *StandardLogger) getStackTrace() string {
 	var builder strings.Builder
 	
-	// Start after the logger's internal calls
 	for i := l.config.CallerSkip; i < l.config.CallerSkip+l.config.CallerDepth; i++ {
 		pc, file, line, ok := runtime.Caller(i)
 		if !ok {
 			break
 		}
 		
-		// Get function name
 		fn := runtime.FuncForPC(pc)
 		funcName := "unknown"
 		if fn != nil {
 			funcName = fn.Name()
-			// Remove path from function name
 			if idx := strings.LastIndex(funcName, "/"); idx != -1 {
 				funcName = funcName[idx+1:]
 			}
-			// Remove package from function name for better readability
 			if idx := strings.Index(funcName, "."); idx != -1 {
 				funcName = funcName[idx+1:]
 			}
 		}
 		
-		// Get just the short file name
 		file = filepath.Base(file)
 		
-		// Add to stack trace
 		builder.WriteString(fmt.Sprintf("\n    at %s (%s:%d)", funcName, file, line))
 	}
 	
 	return builder.String()
 }
 
-// output writes the log message to the configured writer
 func (l *StandardLogger) output(level int, message string) {
 	var builder strings.Builder
 	
-	// Add timestamp if enabled
 	if l.config.EnableTime {
 		timestamp := time.Now().Format("2006-01-02 15:04:05.000")
 		builder.WriteString(timestamp)
 		builder.WriteString(" ")
 	}
 	
-	// Add log level with color if enabled
 	if !l.config.DisableColors {
 		builder.WriteString(levelColors[level])
 	}
@@ -352,10 +306,9 @@ func (l *StandardLogger) output(level int, message string) {
 		builder.WriteString(ColorReset)
 	}
 	
-	// Add layer if set
 	if l.layer != "" {
 		if !l.config.DisableColors {
-			builder.WriteString("\033[90m") // Dark gray
+			builder.WriteString("\033[90m")
 		}
 		builder.WriteString(" [")
 		builder.WriteString(l.layer)
@@ -365,15 +318,13 @@ func (l *StandardLogger) output(level int, message string) {
 		}
 	}
 	
-	// Add caller info if enabled
 	if l.config.EnableCaller {
 		_, file, line, ok := runtime.Caller(l.config.CallerSkip)
 		if ok {
-			// Get just the short file name
 			file = filepath.Base(file)
 			
 			if !l.config.DisableColors {
-				builder.WriteString("\033[90m") // Dark gray
+				builder.WriteString("\033[90m")
 			}
 			builder.WriteString(" ")
 			builder.WriteString(file)
@@ -385,7 +336,6 @@ func (l *StandardLogger) output(level int, message string) {
 		}
 	}
 	
-	// Add fields
 	if len(l.fields) > 0 {
 		builder.WriteString(" ")
 		first := true
@@ -400,11 +350,9 @@ func (l *StandardLogger) output(level int, message string) {
 		}
 	}
 	
-	// Add message
 	builder.WriteString(" | ")
 	builder.WriteString(message)
 	
-	// Add stack trace if enabled
 	if l.trace {
 		stackTrace := l.getStackTrace()
 		builder.WriteString("\nStack trace:")
@@ -413,10 +361,8 @@ func (l *StandardLogger) output(level int, message string) {
 	
 	builder.WriteString("\n")
 	
-	// Write to output
 	fmt.Fprint(l.config.Writer, builder.String())
 	
-	// Handle fatal and panic levels
 	if level == FatalLevel {
 		os.Exit(1)
 	} else if level == PanicLevel {
@@ -424,62 +370,51 @@ func (l *StandardLogger) output(level int, message string) {
 	}
 }
 
-// Debug logs a debug message
-func (l *StandardLogger) Debug(args ...interface{}) {
+func (l *StandardLogger) Debug(args ...any) {
 	l.log(DebugLevel, args...)
 }
 
-// Debugf logs a formatted debug message
-func (l *StandardLogger) Debugf(format string, args ...interface{}) {
+func (l *StandardLogger) Debugf(format string, args ...any) {
 	l.logf(DebugLevel, format, args...)
 }
 
-// Info logs an info message
-func (l *StandardLogger) Info(args ...interface{}) {
+func (l *StandardLogger) Info(args ...any) {
 	l.log(InfoLevel, args...)
 }
 
-// Infof logs a formatted info message
-func (l *StandardLogger) Infof(format string, args ...interface{}) {
+func (l *StandardLogger) Infof(format string, args ...any) {
 	l.logf(InfoLevel, format, args...)
 }
 
-// Warn logs a warning message
-func (l *StandardLogger) Warn(args ...interface{}) {
+func (l *StandardLogger) Warn(args ...any) {
 	l.log(WarnLevel, args...)
 }
 
-// Warnf logs a formatted warning message
-func (l *StandardLogger) Warnf(format string, args ...interface{}) {
+func (l *StandardLogger) Warnf(format string, args ...any) {
 	l.logf(WarnLevel, format, args...)
 }
 
-// Error logs an error message
-func (l *StandardLogger) Error(args ...interface{}) {
+func (l *StandardLogger) Error(args ...any) {
 	l.log(ErrorLevel, args...)
 }
 
-// Errorf logs a formatted error message
-func (l *StandardLogger) Errorf(format string, args ...interface{}) {
+func (l *StandardLogger) Errorf(format string, args ...any) {
 	l.logf(ErrorLevel, format, args...)
 }
 
-// Fatal logs a fatal message and exits
-func (l *StandardLogger) Fatal(args ...interface{}) {
+func (l *StandardLogger) Fatal(args ...any) {
 	l.log(FatalLevel, args...)
 }
 
-// Fatalf logs a formatted fatal message and exits
-func (l *StandardLogger) Fatalf(format string, args ...interface{}) {
+func (l *StandardLogger) Fatalf(format string, args ...any) {
 	l.logf(FatalLevel, format, args...)
 }
 
-// Panic logs a panic message and panics
-func (l *StandardLogger) Panic(args ...interface{}) {
+func (l *StandardLogger) Panic(args ...any) {
 	l.log(PanicLevel, args...)
 }
 
-// Panicf logs a formatted panic message and panics
-func (l *StandardLogger) Panicf(format string, args ...interface{}) {
+func (l *StandardLogger) Panicf(format string, args ...any) {
 	l.logf(PanicLevel, format, args...)
 }
+

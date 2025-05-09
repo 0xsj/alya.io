@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: alya-postgres
+  namespace: alya
+  labels:
+    app: alya-postgres
+    app.kubernetes.io/name: alya-postgres
+    app.kubernetes.io/part-of: alya
+spec:
+  serviceName: alya-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alya-postgres
+  template:
+    metadata:
+      labels:
+        app: alya-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:14-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_USER
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: alya-secrets
+                  key: db-password
+            - name: POSTGRES_DB
+              value: "alya"
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alya-postgres
+  namespace: alya
+  labels:
+    app: alya-postgres
+    app.kubernetes.io/name: alya-postgres
+    app.kubernetes.io/part-of: alya
+spec:
+  selector:
+    app: alya-postgres
+  ports:
+    - port: 5432
+      targetPort: postgres
+  type: ClusterIP

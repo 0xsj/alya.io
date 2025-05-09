@@ -24,15 +24,12 @@ func HTTPMiddleware(logger Logger) func(next http.Handler) http.Handler {
 			}
 			
 			start := time.Now()
-			
-			// Create request-specific logger
 			reqLogger := logger.With("request_id", requestID).
 				With("method", r.Method).
 				With("path", r.URL.Path).
 				With("remote_addr", r.RemoteAddr).
 				With("user_agent", r.UserAgent())
-			
-			// Store logger in context
+		
 			ctx := context.WithValue(r.Context(), LoggerKey, reqLogger)
 			ctx = context.WithValue(ctx, requestIDKey, requestID)
 			r = r.WithContext(ctx)
@@ -41,6 +38,7 @@ func HTTPMiddleware(logger Logger) func(next http.Handler) http.Handler {
 			w.Header().Set("X-Request-ID", requestID)
 			
 			// Create response wrapper to capture status code
+		
 			ww := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 			
 			reqLogger.Infof("Request started: %s %s", r.Method, r.URL.Path)
@@ -51,7 +49,6 @@ func HTTPMiddleware(logger Logger) func(next http.Handler) http.Handler {
 			// Calculate duration
 			duration := time.Since(start)
 			
-			// Log request completion
 			reqLogger.WithFields(map[string]any{
 				"status":       ww.statusCode,
 				"duration_ms":  duration.Milliseconds(),

@@ -1,6 +1,6 @@
 {
   "server": {
-    "port": 8080,
+    "port": 8081,
     "host": "0.0.0.0",
     "timeout": "30s",
     "cors": {
@@ -14,7 +14,7 @@
   },
   "database": {
     "host": "localhost",
-    "port": 5432,
+    "port": 5433,
     "user": "postgres",
     "password": "postgres",
     "name": "alya",

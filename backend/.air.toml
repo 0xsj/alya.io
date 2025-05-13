@@ -1,0 +1,43 @@
+# .air.toml
+root = "."
+tmp_dir = "tmp"
+
+[build]
+# Properly point to your main.go file in cmd/server
+cmd = "go build -o ./tmp/app ./cmd/server"
+# Binary file produced by 'cmd'
+bin = "tmp/app"
+# Exclude specific directories and files
+exclude_dir = ["assets", "tmp", "vendor", "bin", "frontend", ".git"]
+exclude_file = []
+# Include specific file extensions to watch
+include_ext = ["go", "tpl", "tmpl", "html", "json"]
+# Exclude specific file extensions
+exclude_regex = ["_test.go"]
+# Clean the built binary before rebuilding
+clean_on_exit = true
+
+[run]
+# The command to execute the built binary
+cmd = "./tmp/app"
+# Delay after file changes to rebuild
+delay = 1000
+# Kill process on changes
+stop_on_error = true
+
+[color]
+main = "magenta"
+watcher = "cyan"
+build = "yellow"
+runner = "green"
+
+[log]
+time = true
+
+[misc]
+# Clean the console on rebuild
+clean_on_exit = true
+
+[screen]
+clear_on_rebuild = true
+keep_scroll = true

@@ -31,12 +31,33 @@ MIGRATE_VERSION := v4.15.2
 
 .PHONY: all build clean run test lint fmt vet docker-build docker-push setup help
 .PHONY: db-setup db-create-migration db-migrate db-rollback db-drop db-reset db-version db-force
+.PHONY: dev install-air
 
 all: setup lint test build ## Default: setup, lint, test, and build
 
 build: ## Build the application
 	@echo "Building $(APP_NAME)..."
 	@go build $(LDFLAGS) -o $(GOBIN)/$(APP_NAME) ./main.go
+
+build-server: ## Build the server application
+	@echo "Building server..."
+	@go build -o $(GOBIN)/alya-server $(LDFLAGS) ./cmd/server
+
+
+dev: ## Run the application with hot-reload (air)
+	@if command -v air > /dev/null; then \
+		echo "Running with air for hot-reload..."; \
+		air; \
+	else \
+		echo "air not found. Installing air..."; \
+		go install github.com/cosmtrek/air@latest; \
+		air; \
+	fi
+
+
+run-server: ## Run the server application
+	@echo "Running server..."
+	@go run $(LDFLAGS) ./cmd/server
 
 clean: ## Clean the project
 	@echo "Cleaning..."

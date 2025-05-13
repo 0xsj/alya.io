@@ -18,7 +18,7 @@ DOCKER_TAG ?= latest
 
 # Database related variables
 DB_HOST ?= localhost
-DB_PORT ?= 5432
+DB_PORT ?= 5433
 DB_USER ?= postgres
 DB_PASSWORD ?= postgres
 DB_NAME ?= alya
@@ -87,6 +87,9 @@ setup: ## Set up the development environment
 	@go mod tidy
 
 # Database migration commands
+# Add these rules to your existing Makefile
+
+# Database migration commands
 db-setup: ## Install migrate CLI tool for database migrations
 	@echo "Installing migrate CLI tool..."
 	@if [ ! -f $(MIGRATE) ]; then \
@@ -109,6 +112,31 @@ db-create-migration: db-setup ## Create a new migration (usage: make db-create-m
 db-migrate: db-setup ## Run all pending migrations
 	@echo "Running migrations..."
 	@$(MIGRATE) -path $(MIGRATIONS_DIR) -database postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE) up
+	@echo "Migrations applied successfully."
+
+db-migrate-container: ## Run migrations directly in the database container
+	@echo "Running migrations from inside the container..."
+	@docker cp $(MIGRATIONS_DIR) alya-db:/tmp/
+	@docker exec alya-db sh -c "apt-get update && apt-get install -y wget && \
+		wget -q https://github.com/golang-migrate/migrate/releases/download/v4.15.2/migrate.linux-amd64.tar.gz && \
+		tar -xzf migrate.linux-amd64.tar.gz && \
+		./migrate -path=/tmp/migrations -database postgres://postgres:postgres@localhost:5432/alya?sslmode=disable up"
+	@echo "Migrations applied successfully."
+
+db-migrate-psql: ## Run migrations using psql directly in the container
+	@echo "Running migrations using psql directly..."
+	@docker cp $(MIGRATIONS_DIR) alya-db:/tmp/
+	@docker exec alya-db psql -U postgres -d alya -f /tmp/migrations/000001_create_videos_table.up.sql
+	@echo "Migrations applied successfully."
+
+db-migrate-docker: ## Run migrations inside Docker container
+	@echo "Running migrations inside Docker container..."
+	@docker run --rm --network backend_default \
+		-v $(GOBASE)/$(MIGRATIONS_DIR):/migrations \
+		migrate/migrate:v4 \
+		-path=/migrations \
+		-database postgres://$(DB_USER):$(DB_PASSWORD)@alya-db:5432/$(DB_NAME)?sslmode=$(DB_SSLMODE) \
+		up -verbose
 	@echo "Migrations applied successfully."
 
 db-rollback: db-setup ## Rollback the last migration

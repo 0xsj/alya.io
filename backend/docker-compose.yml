@@ -10,7 +10,7 @@ services:
       - ALYA_ENV=development
       - ALYA_SERVER_PORT=8080
       - ALYA_DB_HOST=db
-      - ALYA_DB_PORT=5432
+      - ALYA_DB_PORT=5432 # Use the standard PostgreSQL port inside the container
       - ALYA_DB_USER=postgres
       - ALYA_DB_PASSWORD=postgres
       - ALYA_DB_NAME=alya
@@ -28,7 +28,7 @@ services:
     image: postgres:14-alpine
     container_name: alya-db
     ports:
-      - "5432:5432"
+      - "5433:5432" # Map host port 5433 to container port 5432 (standard PostgreSQL port)
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -41,7 +41,7 @@ services:
     image: redis:7-alpine
     container_name: alya-redis
     ports:
-      - "6379:6379"
+      - "6380:6379" # Map host port 6380 to container port 6379 (standard Redis port)
     volumes:
       - redis_data:/data
     restart: unless-stopped

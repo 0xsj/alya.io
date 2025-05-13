@@ -9,14 +9,12 @@ import (
 	"github.com/0xsj/alya.io/backend/pkg/errors"
 	"github.com/0xsj/alya.io/backend/pkg/logger"
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq" // PostgreSQL driver
+	_ "github.com/lib/pq"
 )
 
-// NewDB creates a new database connection
 func NewDB(config *config.Config, logger logger.Logger) (*sqlx.DB, error) {
 	log := logger.WithLayer("database")
 	
-	// Build connection string
 	connStr := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		config.Database.Host,
@@ -27,19 +25,16 @@ func NewDB(config *config.Config, logger logger.Logger) (*sqlx.DB, error) {
 		config.Database.SSLMode,
 	)
 	
-	// Connect to database
 	db, err := sqlx.Connect("postgres", connStr)
 	if err != nil {
 		return nil, errors.WrapWith(err, "failed to connect to database", 
 			errors.NewDatabaseError("database connection error", errors.ErrDatabase))
 	}
 	
-	// Configure connection pool
 	db.SetMaxOpenConns(config.Database.MaxConns)
 	db.SetMaxIdleConns(config.Database.MaxConns / 2)
 	db.SetConnMaxLifetime(time.Hour)
 	
-	// Test connection
 	if err := db.Ping(); err != nil {
 		return nil, errors.WrapWith(err, "failed to ping database",
 			errors.NewDatabaseError("database connection error", errors.ErrDatabase))

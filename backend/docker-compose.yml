@@ -28,7 +28,7 @@ services:
     image: postgres:14-alpine
     container_name: alya-db
     ports:
-      - "5433:5432" # Map host port 5433 to container port 5432 (standard PostgreSQL port)
+      - "5433:5432"
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres

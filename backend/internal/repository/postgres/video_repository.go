@@ -12,47 +12,38 @@ type VideoRepository struct {
 	logger logger.Logger
 }
 
-// Delete implements domain.VideoRepository.
 func (r *VideoRepository) Delete(id string) error {
 	panic("unimplemented")
 }
 
-// GetByYouTubeID implements domain.VideoRepository.
 func (r *VideoRepository) GetByYouTubeID(youtubeID string) (*domain.Video, error) {
 	panic("unimplemented")
 }
 
-// List implements domain.VideoRepository.
 func (r *VideoRepository) List(page int, pageSize int, filters map[string]any) ([]*domain.Video, int, error) {
 	panic("unimplemented")
 }
 
-// ListByStatus implements domain.VideoRepository.
 func (r *VideoRepository) ListByStatus(status domain.VideoStatus, limit int) ([]*domain.Video, error) {
 	panic("unimplemented")
 }
 
-// ListByUserID implements domain.VideoRepository.
 func (r *VideoRepository) ListByUserID(userID string, page int, pageSize int) ([]*domain.Video, int, error) {
 	panic("unimplemented")
 }
 
-// Search implements domain.VideoRepository.
 func (r *VideoRepository) Search(query string, page int, pageSize int) ([]*domain.Video, int, error) {
 	panic("unimplemented")
 }
 
-// Update implements domain.VideoRepository.
 func (r *VideoRepository) Update(video *domain.Video) error {
 	panic("unimplemented")
 }
 
-// UpdateProcessingResults implements domain.VideoRepository.
 func (r *VideoRepository) UpdateProcessingResults(id string, transcriptID string, summaryID string) error {
 	panic("unimplemented")
 }
 
-// UpdateStatus implements domain.VideoRepository.
 func (r *VideoRepository) UpdateStatus(id string, status domain.VideoStatus, errorMessage string) error {
 	panic("unimplemented")
 }

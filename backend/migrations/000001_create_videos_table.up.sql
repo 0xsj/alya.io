@@ -34,3 +34,24 @@ CREATE INDEX idx_videos_youtube_id ON videos(youtube_id);
 CREATE INDEX idx_videos_status ON videos(status);
 CREATE INDEX idx_videos_created_by ON videos(created_by);
 CREATE INDEX idx_videos_created_at ON videos(created_at);
+CREATE INDEX idx_videos_tags ON videos USING GIN(tags);
+
+-- Add a full text search index for title and description
+ALTER TABLE videos ADD COLUMN tsv_document TSVECTOR;
+CREATE INDEX idx_videos_tsv ON videos USING GIN(tsv_document);
+
+-- Create a trigger to update the full text search vector
+CREATE OR REPLACE FUNCTION videos_tsvector_update_trigger()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.tsv_document = 
+        setweight(to_tsvector('english', coalesce(NEW.title, '')), 'A') ||
+        setweight(to_tsvector('english', coalesce(NEW.description, '')), 'B');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tsvector_update
+BEFORE INSERT OR UPDATE ON videos
+FOR EACH ROW
+EXECUTE FUNCTION videos_tsvector_update_trigger();

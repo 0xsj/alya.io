@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alya-redis
+  namespace: alya
+  labels:
+    app: alya-redis
+    app.kubernetes.io/name: alya-redis
+    app.kubernetes.io/part-of: alya
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alya-redis
+  template:
+    metadata:
+      labels:
+        app: alya-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+              name: redis
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+          livenessProbe:
+            tcpSocket:
+              port: redis
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alya-redis
+  namespace: alya
+  labels:
+    app: alya-redis
+    app.kubernetes.io/name: alya-redis
+    app.kubernetes.io/part-of: alya
+spec:
+  selector:
+    app: alya-redis
+  ports:
+    - port: 6379
+      targetPort: redis
+  type: ClusterIP
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: alya
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

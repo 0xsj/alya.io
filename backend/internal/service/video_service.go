@@ -14,14 +14,20 @@ import (
 )
 
 type VideoService struct {
-	repo   domain.VideoRepository
-	logger logger.Logger
+	repo               domain.VideoRepository
+	transcriptService  *TranscriptService
+	logger             logger.Logger
 }
 
-func NewVideoService(repo domain.VideoRepository, logger logger.Logger) *VideoService {
+func NewVideoService(
+	repo domain.VideoRepository, 
+	transcriptService *TranscriptService,
+	logger logger.Logger,
+) *VideoService {
 	return &VideoService{
-		repo:   repo,
-		logger: logger.WithLayer("service.video"),
+		repo:              repo,
+		transcriptService: transcriptService,
+		logger:            logger.WithLayer("service.video"),
 	}
 }
 
@@ -47,8 +53,8 @@ func (s *VideoService) ProcessVideo(youtubeURL string, userID string) (*domain.V
 			}
 			existingVideo.Status = domain.VideoStatusPending
 			existingVideo.ErrorMessage = ""
-			// In a real app, you'd then start the processing in a background goroutine
-			// go s.processVideoAsync(existingVideo.ID)
+			// Start processing in background
+			go s.processVideoAsync(existingVideo.ID)
 		}
 		return existingVideo, nil
 	}
@@ -72,8 +78,8 @@ func (s *VideoService) ProcessVideo(youtubeURL string, userID string) (*domain.V
 		return nil, err
 	}
 
-	// In a real implementation, start the processing in a background goroutine
-	// go s.processVideoAsync(video.ID)
+	// Start processing in background
+	go s.processVideoAsync(video.ID)
 
 	return video, nil
 }
@@ -106,9 +112,6 @@ func (s *VideoService) SearchVideos(query string, page int, pageSize int, userID
 		"search": query,
 	}
 	
-	// We could add additional filters like "visibility = public OR created_by = userID"
-	// but let's keep it simple for now and filter in memory
-	
 	videos, total, err := s.repo.List(page, pageSize, filters)
 	if err != nil {
 		return nil, 0, err
@@ -137,32 +140,50 @@ func (s *VideoService) DeleteVideo(id string, userID string) error {
 		return errors.NewForbiddenError("you don't have permission to delete this video", nil)
 	}
 
-	// Delete the video
+	// Delete the video (transcript will be cascade deleted due to foreign key)
 	return s.repo.Delete(id)
 }
 
-// processVideoAsync is a helper function that would process the video in the background
-// In a real implementation, this would be part of a worker or background job system
-func (s *VideoService) processVideoAsync(videoID string) {
-	// This would be a much more sophisticated implementation in a real system
-	// For now, just simulate the process
+// GetVideoWithTranscript returns video details along with transcript
+func (s *VideoService) GetVideoWithTranscript(id string, userID string) (*domain.Video, *domain.Transcript, error) {
+	// Get video details
+	video, err := s.GetVideoDetails(id, userID)
+	if err != nil {
+		return nil, nil, err
+	}
 
-	// 1. Update status to processing
+	// Get transcript (will extract if doesn't exist)
+	transcript, err := s.transcriptService.GetTranscriptByVideoID(video.ID, userID)
+	if err != nil {
+		s.logger.Warn("Failed to get transcript", "video_id", video.ID, "error", err)
+		// Return video without transcript rather than failing completely
+		return video, nil, nil
+	}
+
+	return video, transcript, nil
+}
+
+// processVideoAsync handles video processing in the background
+func (s *VideoService) processVideoAsync(videoID string) {
+	s.logger.Info("Starting video processing", "video_id", videoID)
+
+	// Update status to processing
 	err := s.repo.UpdateStatus(videoID, domain.VideoStatusProcessing, "")
 	if err != nil {
 		s.logger.Errorf("Failed to update video status to processing: %v", err)
 		return
 	}
 
-	// 2. Fetch the video metadata from YouTube API
-	// This is where you'd use an external YouTube API client
-	// For now, we'll simulate with arbitrary values
+	// Get video details
 	video, err := s.repo.GetByID(videoID)
 	if err != nil {
 		s.logger.Errorf("Failed to get video by ID: %v", err)
+		s.repo.UpdateStatus(videoID, domain.VideoStatusFailed, "Failed to retrieve video details")
 		return
 	}
 
+	// Step 1: Extract basic video metadata (simulated for now)
+	// In a real implementation, you would use YouTube API here
 	video.Title = "Sample YouTube Video"
 	video.Description = "This is a sample description for the video."
 	video.ThumbnailURL = "https://img.youtube.com/vi/" + video.YouTubeID + "/maxresdefault.jpg"
@@ -173,7 +194,7 @@ func (s *VideoService) processVideoAsync(videoID string) {
 	video.Views = 1000
 	video.LikeCount = 100
 	video.CommentCount = 50
-	video.PublishedAt = time.Now().Add(-24 * time.Hour) 
+	video.PublishedAt = time.Now().Add(-24 * time.Hour)
 	
 	err = s.repo.Update(video)
 	if err != nil {
@@ -182,10 +203,25 @@ func (s *VideoService) processVideoAsync(videoID string) {
 		return
 	}
 
-	transcriptID := uuid.New().String()
-	
-	summaryID := uuid.New().String()
-	
+	// Step 2: Extract transcript
+	transcript, err := s.transcriptService.extractAndSaveTranscript(video.YouTubeID)
+	if err != nil {
+		s.logger.Errorf("Failed to extract transcript: %v", err)
+		// Don't fail the entire process if transcript extraction fails
+		s.logger.Warn("Continuing without transcript", "video_id", videoID)
+	}
+
+	var transcriptID string
+	if transcript != nil {
+		transcriptID = transcript.ID
+		s.logger.Info("Successfully extracted transcript", "video_id", videoID, "transcript_id", transcriptID)
+	}
+
+	// Step 3: Update video with processing results
+	// For now, we'll just mark as completed
+	// In the future, this is where you would generate summaries, etc.
+	summaryID := "" // TODO: Implement summary generation
+
 	err = s.repo.UpdateProcessingResults(videoID, transcriptID, summaryID)
 	if err != nil {
 		s.logger.Errorf("Failed to update processing results: %v", err)

@@ -155,7 +155,7 @@ func (r *VideoRepository) Update(video *domain.Video) error {
 	return nil
 }
 
-func (r *VideoRepository) UpdateStatus(id string, status domain.VideoStatus, errorMessage string) error {
+func (r *VideoRepository) UpdateStatus(id string, status domain.VideoStatus, errorMessage *string) error {
 	query := `
 		UPDATE videos
 		SET 
@@ -192,7 +192,7 @@ func (r *VideoRepository) UpdateStatus(id string, status domain.VideoStatus, err
 }
 
 
-func (r *VideoRepository) UpdateProcessingResults(id string, transcriptID string, summaryID string) error {
+func (r *VideoRepository) UpdateProcessingResults(id string, transcriptID *string, summaryID *string) error {
 	query := `
 		UPDATE videos
 		SET 

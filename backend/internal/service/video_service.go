@@ -1,4 +1,4 @@
-// internal/service/video_service.go
+// internal/service/video_service.go - Fixed for pointer fields
 package service
 
 import (
@@ -47,12 +47,12 @@ func (s *VideoService) ProcessVideo(youtubeURL string, userID string) (*domain.V
 		// If the video exists but is in a failed state, we could try to process it again
 		if existingVideo.Status == domain.VideoStatusFailed {
 			// Reset the status to pending
-			err := s.repo.UpdateStatus(existingVideo.ID, domain.VideoStatusPending, "")
+			err := s.repo.UpdateStatus(existingVideo.ID, domain.VideoStatusPending, nil)
 			if err != nil {
 				return nil, err
 			}
 			existingVideo.Status = domain.VideoStatusPending
-			existingVideo.ErrorMessage = ""
+			existingVideo.ErrorMessage = nil
 			// Start processing in background
 			go s.processVideoAsync(existingVideo.ID)
 		}
@@ -163,12 +163,25 @@ func (s *VideoService) GetVideoWithTranscript(id string, userID string) (*domain
 	return video, transcript, nil
 }
 
+// Helper functions to create pointers
+func stringPtr(s string) *string {
+	return &s
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
+}
+
+func timePtr(t time.Time) *time.Time {
+	return &t
+}
+
 // processVideoAsync handles video processing in the background
 func (s *VideoService) processVideoAsync(videoID string) {
 	s.logger.Info("Starting video processing", "video_id", videoID)
 
 	// Update status to processing
-	err := s.repo.UpdateStatus(videoID, domain.VideoStatusProcessing, "")
+	err := s.repo.UpdateStatus(videoID, domain.VideoStatusProcessing, nil)
 	if err != nil {
 		s.logger.Errorf("Failed to update video status to processing: %v", err)
 		return
@@ -178,28 +191,28 @@ func (s *VideoService) processVideoAsync(videoID string) {
 	video, err := s.repo.GetByID(videoID)
 	if err != nil {
 		s.logger.Errorf("Failed to get video by ID: %v", err)
-		s.repo.UpdateStatus(videoID, domain.VideoStatusFailed, "Failed to retrieve video details")
+		s.repo.UpdateStatus(videoID, domain.VideoStatusFailed, stringPtr("Failed to retrieve video details"))
 		return
 	}
 
 	// Step 1: Extract basic video metadata (simulated for now)
 	// In a real implementation, you would use YouTube API here
 	video.Title = "Sample YouTube Video"
-	video.Description = "This is a sample description for the video."
-	video.ThumbnailURL = "https://img.youtube.com/vi/" + video.YouTubeID + "/maxresdefault.jpg"
-	video.Duration = 600 
-	video.Language = "en"
-	video.Channel = "Sample Channel"
-	video.ChannelID = "UCxxxx"
-	video.Views = 1000
-	video.LikeCount = 100
-	video.CommentCount = 50
-	video.PublishedAt = time.Now().Add(-24 * time.Hour)
+	video.Description = stringPtr("This is a sample description for the video.")
+	video.ThumbnailURL = stringPtr("https://img.youtube.com/vi/" + video.YouTubeID + "/maxresdefault.jpg")
+	video.Duration = int64Ptr(600)
+	video.Language = stringPtr("en")
+	video.Channel = stringPtr("Sample Channel")
+	video.ChannelID = stringPtr("UCxxxx")
+	video.Views = int64Ptr(1000)
+	video.LikeCount = int64Ptr(100)
+	video.CommentCount = int64Ptr(50)
+	video.PublishedAt = timePtr(time.Now().Add(-24 * time.Hour))
 	
 	err = s.repo.Update(video)
 	if err != nil {
 		s.logger.Errorf("Failed to update video metadata: %v", err)
-		s.repo.UpdateStatus(videoID, domain.VideoStatusFailed, "Failed to update video metadata")
+		s.repo.UpdateStatus(videoID, domain.VideoStatusFailed, stringPtr("Failed to update video metadata"))
 		return
 	}
 
@@ -211,21 +224,21 @@ func (s *VideoService) processVideoAsync(videoID string) {
 		s.logger.Warn("Continuing without transcript", "video_id", videoID)
 	}
 
-	var transcriptID string
+	var transcriptID *string
 	if transcript != nil {
-		transcriptID = transcript.ID
-		s.logger.Info("Successfully extracted transcript", "video_id", videoID, "transcript_id", transcriptID)
+		transcriptID = stringPtr(transcript.ID)
+		s.logger.Info("Successfully extracted transcript", "video_id", videoID, "transcript_id", transcript.ID)
 	}
 
 	// Step 3: Update video with processing results
 	// For now, we'll just mark as completed
 	// In the future, this is where you would generate summaries, etc.
-	summaryID := "" // TODO: Implement summary generation
+	var summaryID *string // TODO: Implement summary generation
 
 	err = s.repo.UpdateProcessingResults(videoID, transcriptID, summaryID)
 	if err != nil {
 		s.logger.Errorf("Failed to update processing results: %v", err)
-		s.repo.UpdateStatus(videoID, domain.VideoStatusFailed, "Failed to update processing results")
+		s.repo.UpdateStatus(videoID, domain.VideoStatusFailed, stringPtr("Failed to update processing results"))
 		return
 	}
 	

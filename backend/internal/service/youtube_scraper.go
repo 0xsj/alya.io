@@ -1,4 +1,4 @@
-// internal/service/youtube_scraper.go
+// internal/service/youtube_scraper.go - Updated with current working method
 package service
 
 import (
@@ -21,13 +21,6 @@ import (
 type YouTubeScraper struct {
 	client *http.Client
 	logger logger.Logger
-}
-
-type YouTubePlayerConfig struct {
-	Args struct {
-		RawPlayerResponse json.RawMessage `json:"raw_player_response"`
-		PlayerResponse    json.RawMessage `json:"player_response"`
-	} `json:"args"`
 }
 
 type PlayerResponse struct {
@@ -58,12 +51,6 @@ type Name struct {
 	SimpleText string `json:"simpleText"`
 }
 
-type CaptionEntry struct {
-	Start float64 `json:"start,string"`
-	Dur   float64 `json:"dur,string"`
-	Text  string  `json:"text"`
-}
-
 func NewYouTubeScraper(logger logger.Logger) *YouTubeScraper {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -83,7 +70,7 @@ func NewYouTubeScraper(logger logger.Logger) *YouTubeScraper {
 func (ys *YouTubeScraper) GetVideoTranscript(videoID string) (*domain.Transcript, error) {
 	ys.logger.Info("Starting transcript extraction", "video_id", videoID)
 
-	// Get player config from YouTube page
+	// Get player response from YouTube page
 	playerResponse, err := ys.getPlayerResponse(videoID)
 	if err != nil {
 		return nil, errors.WrapWith(err, "failed to get player response", 
@@ -171,12 +158,17 @@ func (ys *YouTubeScraper) getPlayerResponse(videoID string) (*PlayerResponse, er
 }
 
 func (ys *YouTubeScraper) extractPlayerResponse(pageContent string) (*PlayerResponse, error) {
-	// Try multiple patterns to find player response
+	// Updated patterns based on Stack Overflow post
 	patterns := []string{
+		// Try the new method first (Jan 2025 update)
+		`ytplayer\.config\.args\.raw_player_response\s*=\s*(\{.*?\});`,
+		// Fallback patterns
 		`var ytInitialPlayerResponse = (\{.*?\});`,
 		`window\["ytInitialPlayerResponse"\] = (\{.*?\});`,
 		`ytInitialPlayerResponse":\s*(\{.*?\})(?:,"|\}$)`,
 		`"playerResponse":"(\{.*?\})"`,
+		// Additional patterns for embedded players
+		`ytplayer\.config\s*=\s*(\{.*?\});`,
 	}
 
 	for _, pattern := range patterns {
@@ -288,7 +280,6 @@ func (ys *YouTubeScraper) downloadAndParseCaptions(captionURL string) ([]domain.
 
 func (ys *YouTubeScraper) parseXMLCaptions(xmlContent string) ([]domain.TranscriptSegment, error) {
 	// Parse XML using regex (simple approach for YouTube's specific format)
-	// In production, you might want to use a proper XML parser
 	re := regexp.MustCompile(`<text start="([^"]*)" dur="([^"]*)"[^>]*>([^<]*)</text>`)
 	matches := re.FindAllStringSubmatch(xmlContent, -1)
 

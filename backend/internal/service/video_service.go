@@ -11,6 +11,7 @@ import (
 	"github.com/0xsj/alya.io/backend/pkg/errors"
 	"github.com/0xsj/alya.io/backend/pkg/logger"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
 type VideoService struct {
@@ -68,6 +69,7 @@ func (s *VideoService) ProcessVideo(youtubeURL string, userID string) (*domain.V
 		URL:        youtubeURL,
 		Status:     domain.VideoStatusPending,
 		Visibility: domain.VideoVisibilityPublic,
+		Tags:       pq.StringArray{}, // Initialize empty array
 		CreatedBy:  userID,
 		CreatedAt:  now,
 		UpdatedAt:  now,
@@ -79,7 +81,9 @@ func (s *VideoService) ProcessVideo(youtubeURL string, userID string) (*domain.V
 	}
 
 	// Start processing in background
+	s.logger.Info("About to start background processing", "video_id", video.ID)
 	go s.processVideoAsync(video.ID)
+	s.logger.Info("Background processing goroutine started", "video_id", video.ID)
 
 	return video, nil
 }

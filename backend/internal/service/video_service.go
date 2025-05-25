@@ -1,9 +1,13 @@
-// internal/service/video_service.go - Fixed for pointer fields
+// internal/service/video_service.go - Updated with real YouTube data extraction
 package service
 
 import (
+	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,6 +22,19 @@ type VideoService struct {
 	repo               domain.VideoRepository
 	transcriptService  *TranscriptService
 	logger             logger.Logger
+	httpClient         *http.Client
+}
+
+// YouTubeVideoData represents basic video metadata from YouTube page
+type YouTubeVideoData struct {
+	Title         string
+	Description   string
+	ChannelName   string
+	ChannelID     string
+	Duration      int64
+	ViewCount     int64
+	LikeCount     int64
+	PublishedDate time.Time
 }
 
 func NewVideoService(
@@ -29,6 +46,9 @@ func NewVideoService(
 		repo:              repo,
 		transcriptService: transcriptService,
 		logger:            logger.WithLayer("service.video"),
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}
 }
 
@@ -199,19 +219,45 @@ func (s *VideoService) processVideoAsync(videoID string) {
 		return
 	}
 
-	// Step 1: Extract basic video metadata (simulated for now)
-	// In a real implementation, you would use YouTube API here
-	video.Title = "Sample YouTube Video"
-	video.Description = stringPtr("This is a sample description for the video.")
+	// Step 1: Extract real video metadata from YouTube
+	s.logger.Info("Extracting YouTube metadata", "youtube_id", video.YouTubeID)
+	youtubeData, err := s.extractYouTubeMetadata(video.YouTubeID)
+	if err != nil {
+		s.logger.Warn("Failed to extract YouTube metadata, using defaults", "error", err)
+		// Use fallback data if YouTube extraction fails
+		youtubeData = &YouTubeVideoData{
+			Title:       "YouTube Video",
+			Description: "Unable to extract description",
+			ChannelName: "Unknown Channel",
+			Duration:    0,
+		}
+	}
+
+	// Update video with extracted metadata
+	video.Title = youtubeData.Title
+	if youtubeData.Description != "" {
+		video.Description = stringPtr(youtubeData.Description)
+	}
 	video.ThumbnailURL = stringPtr("https://img.youtube.com/vi/" + video.YouTubeID + "/maxresdefault.jpg")
-	video.Duration = int64Ptr(600)
-	video.Language = stringPtr("en")
-	video.Channel = stringPtr("Sample Channel")
-	video.ChannelID = stringPtr("UCxxxx")
-	video.Views = int64Ptr(1000)
-	video.LikeCount = int64Ptr(100)
-	video.CommentCount = int64Ptr(50)
-	video.PublishedAt = timePtr(time.Now().Add(-24 * time.Hour))
+	if youtubeData.Duration > 0 {
+		video.Duration = int64Ptr(youtubeData.Duration)
+	}
+	video.Language = stringPtr("en") // Default to English, could be detected
+	if youtubeData.ChannelName != "" {
+		video.Channel = stringPtr(youtubeData.ChannelName)
+	}
+	if youtubeData.ChannelID != "" {
+		video.ChannelID = stringPtr(youtubeData.ChannelID)
+	}
+	if youtubeData.ViewCount > 0 {
+		video.Views = int64Ptr(youtubeData.ViewCount)
+	}
+	if youtubeData.LikeCount > 0 {
+		video.LikeCount = int64Ptr(youtubeData.LikeCount)
+	}
+	if !youtubeData.PublishedDate.IsZero() {
+		video.PublishedAt = timePtr(youtubeData.PublishedDate)
+	}
 	
 	err = s.repo.Update(video)
 	if err != nil {
@@ -219,6 +265,8 @@ func (s *VideoService) processVideoAsync(videoID string) {
 		s.repo.UpdateStatus(videoID, domain.VideoStatusFailed, stringPtr("Failed to update video metadata"))
 		return
 	}
+
+	s.logger.Info("Updated video metadata", "title", video.Title, "channel", video.Channel)
 
 	// Step 2: Extract transcript
 	transcript, err := s.transcriptService.extractAndSaveTranscript(video.YouTubeID)
@@ -247,6 +295,137 @@ func (s *VideoService) processVideoAsync(videoID string) {
 	}
 	
 	s.logger.Infof("Successfully processed video: %s", videoID)
+}
+
+// extractYouTubeMetadata extracts basic metadata from YouTube page
+func (s *VideoService) extractYouTubeMetadata(youtubeID string) (*YouTubeVideoData, error) {
+	youtubeURL := fmt.Sprintf("https://www.youtube.com/watch?v=%s", youtubeID)
+	
+	// Create request with browser headers
+	req, err := http.NewRequest("GET", youtubeURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("YouTube returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	pageContent := string(body)
+	
+	// Extract metadata using various methods
+	data := &YouTubeVideoData{}
+	
+	// Extract title from multiple possible locations
+	data.Title = s.extractTitle(pageContent)
+	
+	// Extract description
+	data.Description = s.extractDescription(pageContent)
+	
+	// Extract channel info
+	data.ChannelName = s.extractChannelName(pageContent)
+	
+	// Extract view count
+	data.ViewCount = s.extractViewCount(pageContent)
+	
+	return data, nil
+}
+
+func (s *VideoService) extractTitle(pageContent string) string {
+	patterns := []string{
+		`<meta property="og:title" content="([^"]+)"`,
+		`<title>([^<]+)</title>`,
+		`"title":"([^"]+)"`,
+	}
+	
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(pageContent)
+		if len(matches) > 1 {
+			title := strings.TrimSpace(matches[1])
+			title = strings.TrimSuffix(title, " - YouTube")
+			if title != "" {
+				return title
+			}
+		}
+	}
+	
+	return "YouTube Video"
+}
+
+func (s *VideoService) extractDescription(pageContent string) string {
+	patterns := []string{
+		`<meta property="og:description" content="([^"]+)"`,
+		`<meta name="description" content="([^"]+)"`,
+	}
+	
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(pageContent)
+		if len(matches) > 1 {
+			desc := strings.TrimSpace(matches[1])
+			if desc != "" && len(desc) > 10 { // Avoid generic descriptions
+				return desc
+			}
+		}
+	}
+	
+	return ""
+}
+
+func (s *VideoService) extractChannelName(pageContent string) string {
+	patterns := []string{
+		`"channelName":"([^"]+)"`,
+		`"author":"([^"]+)"`,
+		`<meta property="og:site_name" content="([^"]+)"`,
+	}
+	
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(pageContent)
+		if len(matches) > 1 {
+			channel := strings.TrimSpace(matches[1])
+			if channel != "" && channel != "YouTube" {
+				return channel
+			}
+		}
+	}
+	
+	return ""
+}
+
+func (s *VideoService) extractViewCount(pageContent string) int64 {
+	patterns := []string{
+		`"viewCount":"(\d+)"`,
+		`"view_count":"(\d+)"`,
+	}
+	
+	for _, pattern := range patterns {
+		re := regexp.MustCompile(pattern)
+		matches := re.FindStringSubmatch(pageContent)
+		if len(matches) > 1 {
+			if count, err := strconv.ParseInt(matches[1], 10, 64); err == nil {
+				return count
+			}
+		}
+	}
+	
+	return 0
 }
 
 func extractYouTubeID(youtubeURL string) (string, error) {

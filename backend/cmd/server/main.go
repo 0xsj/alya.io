@@ -31,7 +31,7 @@ func main() {
 		Writer:       os.Stdout,
 	})
 
-	log.Info("Starting Alya.io backend service")
+	log.Info("Starting Alya.io backend service with transcript support")
 
 	// Load configuration
 	cfg, err := config.Load()
@@ -47,9 +47,14 @@ func main() {
 	
 	// Initialize repositories
 	videoRepo := postgres.NewVideoRepository(db, log)
+	transcriptRepo := postgres.NewTranscriptRepository(db, log)
+	
+	// Initialize external services
+	youtubeScraper := service.NewYouTubeScraper(log)
 	
 	// Initialize services
-	videoService := service.NewVideoService(videoRepo, log)
+	transcriptService := service.NewTranscriptService(transcriptRepo, youtubeScraper, log)
+	videoService := service.NewVideoService(videoRepo, transcriptService, log)
 	
 	// Initialize middlewares
 	authMiddleware := middleware.NewAuthMiddleware(log)

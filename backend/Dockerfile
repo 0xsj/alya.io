@@ -17,7 +17,7 @@ COPY go.mod ./
 COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o alya ./main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o alya ./cmd/server/main.go
 
 # Stage 2: Create a minimal runtime image
 FROM alpine:latest

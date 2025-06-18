@@ -1,11 +1,11 @@
 from datetime import datetime
-from typing import datetime
+from typing import Dict, Any
 from fastapi import APIRouter
 
 router = APIRouter()
 
 @router.get("/health")
-async def health_check() -> Dict[str, any]:
+async def health_check() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
